@@ -50,6 +50,10 @@ Mark every task with what it depends on. This is what lets executors run indepen
 - Shared touchpoints (package.json, lockfiles, barrel/index files, route tables, migrations) create dependencies even when the "real" work is independent — either serialize those tasks or pull the shared edit into its own task
 - When unsure, declare the dependency. A false dependency costs a little parallelism; a missed one costs a merge conflict.
 
+## Commit Policy
+
+Plans produce a single commit. Do not add per-task commit steps. The final task of every plan ends with two steps: run the full test suite, then make one commit covering all of the plan's changes.
+
 ## Plan Document Header
 
 **Every plan MUST start with this header:**
@@ -121,6 +125,7 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - Complete code in every step — if a step changes code, show the code
 - Exact commands with expected output
 - Dependencies marked on every task (`Depends on:`)
+- One commit per plan, at the end — never per task
 - DRY, YAGNI, TDD
 
 ## Self-Review

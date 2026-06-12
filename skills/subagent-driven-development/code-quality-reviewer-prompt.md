@@ -12,9 +12,16 @@ Task tool (general-purpose):
 
   DESCRIPTION: [task summary, from implementer's report]
   PLAN_OR_REQUIREMENTS: Task N from [plan-file]
-  BASE_SHA: [commit before task]
-  HEAD_SHA: [current commit]
+  CHANGED_FILES: [file list from implementer's report]
 ```
+
+**Tasks are not committed individually** — the plan gets a single commit at the end. So instead of a SHA range, tell the reviewer to inspect the task's files directly:
+
+```bash
+git diff HEAD -- [changed files]   # modifications to tracked files
+```
+
+plus read any new (untracked) files in full. For the final whole-plan review, dispatched after the single plan commit, use the template's normal `BASE_SHA`/`HEAD_SHA` range (base = commit before the plan commit).
 
 **In addition to standard code quality concerns, the reviewer should check:**
 - Does each file have one clear responsibility with a well-defined interface?

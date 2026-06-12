@@ -50,7 +50,7 @@ digraph process {
         "Dispatch implementer subagent (./implementer-prompt.md)" [shape=box];
         "Implementer subagent asks questions?" [shape=diamond];
         "Answer questions, provide context" [shape=box];
-        "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
+        "Implementer subagent implements, tests, self-reviews (no commit)" [shape=box];
         "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [shape=box];
         "Spec reviewer subagent confirms code matches spec?" [shape=diamond];
         "Implementer subagent fixes spec gaps" [shape=box];
@@ -62,6 +62,7 @@ digraph process {
 
     "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
     "More tasks remain?" [shape=diamond];
+    "Run full test suite, make the single plan commit" [shape=box];
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
     "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
@@ -69,8 +70,8 @@ digraph process {
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
-    "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
-    "Implementer subagent implements, tests, commits, self-reviews" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)";
+    "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, self-reviews (no commit)" [label="no"];
+    "Implementer subagent implements, tests, self-reviews (no commit)" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)";
     "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" -> "Spec reviewer subagent confirms code matches spec?";
     "Spec reviewer subagent confirms code matches spec?" -> "Implementer subagent fixes spec gaps" [label="no"];
     "Implementer subagent fixes spec gaps" -> "Dispatch spec reviewer subagent (./spec-reviewer-prompt.md)" [label="re-review"];
@@ -81,7 +82,8 @@ digraph process {
     "Code quality reviewer subagent approves?" -> "Mark task complete in TodoWrite" [label="yes"];
     "Mark task complete in TodoWrite" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (./implementer-prompt.md)" [label="yes"];
-    "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
+    "More tasks remain?" -> "Run full test suite, make the single plan commit" [label="no"];
+    "Run full test suite, make the single plan commit" -> "Dispatch final code reviewer subagent for entire implementation";
     "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
@@ -114,7 +116,7 @@ Rules for a parallel batch:
 - Dispatch the batch in a single message (multiple Task calls)
 - Cap batches at 3 implementers — review load grows with each one
 - Reviews stay serial and per-task: as each implementer reports DONE, run its spec review, then its code quality review, before marking it complete
-- All implementers share one worktree and branch; disjoint files means their commits won't conflict. If a commit fails on a stale `index.lock` (two commits at the same instant), the implementer retries once
+- All implementers share one worktree and branch. They never commit (the single plan commit happens after all tasks), so disjoint file lists are the only isolation required
 - One implementer reporting BLOCKED doesn't stop the others — collect all reports, then handle the escalation
 
 When in doubt, dispatch sequentially. A conflict between subagents costs more than parallelism saves.
@@ -166,12 +168,12 @@ Implementer: "Got it. Implementing now..."
   - Implemented install-hook command
   - Added tests, 5/5 passing
   - Self-review: Found I missed --force flag, added it
-  - Committed
+  - Files changed: bin/install-hook, tests/install-hook.test.sh
 
 [Dispatch spec compliance reviewer]
 Spec reviewer: ✅ Spec compliant - all requirements met, nothing extra
 
-[Get git SHAs, dispatch code quality reviewer]
+[Dispatch code quality reviewer with the task's changed files]
 Code reviewer: Strengths: Good test coverage, clean. Issues: None. Approved.
 
 [Mark Task 1 complete]
@@ -186,7 +188,7 @@ Implementer:
   - Added verify/repair modes
   - 8/8 tests passing
   - Self-review: All good
-  - Committed
+  - Files changed: src/recovery.ts, tests/recovery.test.ts
 
 [Dispatch spec compliance reviewer]
 Spec reviewer: ❌ Issues:
@@ -213,6 +215,7 @@ Code reviewer: ✅ Approved
 ...
 
 [After all tasks]
+[Run full test suite, make the single plan commit]
 [Dispatch final code-reviewer]
 Final reviewer: All requirements met, ready to merge
 
@@ -258,6 +261,7 @@ Done!
 - Skip reviews (spec compliance OR code quality)
 - Proceed with unfixed issues
 - Dispatch implementers in parallel for tasks that share files or have unmet dependencies (see Parallel Dispatch)
+- Let implementers commit — the plan gets ONE commit, made by you after all tasks complete
 - Make subagent read plan file (provide full text instead)
 - Skip scene-setting context (subagent needs to understand where task fits)
 - Ignore subagent questions (answer before letting them proceed)
