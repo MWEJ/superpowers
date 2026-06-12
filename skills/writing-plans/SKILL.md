@@ -50,6 +50,24 @@ Mark every task with what it depends on. This is what lets executors run indepen
 - Shared touchpoints (package.json, lockfiles, barrel/index files, route tables, migrations) create dependencies even when the "real" work is independent — either serialize those tasks or pull the shared edit into its own task
 - When unsure, declare the dependency. A false dependency costs a little parallelism; a missed one costs a merge conflict.
 
+## Model Assignments
+
+The executor dispatches a separate subagent for implementation, spec review, and quality review. Assign each role a model tier **per task** so the executor doesn't have to guess. Use the least powerful tier that can do the job — it's cheaper and faster.
+
+Tiers (name the tier, not a specific model — model names go stale):
+
+- **fast** — cheap, quick model for mechanical work
+- **standard** — mid-tier model for integration and judgment
+- **most-capable** — strongest available model for design and hard reasoning
+
+How to pick per role:
+
+- **implementation** — scale to the task. 1-2 files with a complete spec → `fast`; multiple files or integration concerns → `standard`; design judgment or broad codebase understanding → `most-capable`.
+- **spec-review** — comparing code against the spec is usually `standard`. Bump to `most-capable` when the spec has subtle or easily-misread requirements.
+- **quality-review** — `standard` for mechanical tasks; `most-capable` when the task carries real architectural weight.
+
+Put the assignment on every task (see Task Structure). When a task is purely mechanical, `fast / standard / standard` is a sensible default; raise tiers when the task warrants it.
+
 ## Commit Policy
 
 Plans produce a single commit. Do not add per-task commit steps. The final task of every plan ends with two steps: run the full test suite, then make one commit covering all of the plan's changes.
@@ -78,6 +96,8 @@ Plans produce a single commit. Do not add per-task commit steps. The final task 
 ### Task N: [Component Name]
 
 **Depends on:** Task M (uses its `WidgetStore` interface) — or `none` if independent
+
+**Models:** implementation: `standard` · spec-review: `standard` · quality-review: `most-capable`
 
 **Files:**
 - Create: `exact/path/to/file.py`
@@ -125,6 +145,7 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - Complete code in every step — if a step changes code, show the code
 - Exact commands with expected output
 - Dependencies marked on every task (`Depends on:`)
+- Model tier assigned for each role on every task (`Models:`)
 - One commit per plan, at the end — never per task
 - DRY, YAGNI, TDD
 

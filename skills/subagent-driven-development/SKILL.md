@@ -90,18 +90,16 @@ digraph process {
 
 ## Model Selection
 
-Use the least powerful model that can handle each role to conserve cost and increase speed.
+**Follow the plan's per-task `Models:` line.** Plans written with superpowers:writing-plans assign a tier (`fast` / `standard` / `most-capable`) for each role — implementation, spec-review, quality-review — on every task. Dispatch each subagent with the tier the task specifies, mapping the tier to the strongest-to-cheapest models available on your platform.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): use a fast, cheap model. Most implementation tasks are mechanical when the plan is well-specified.
+Override only with a reason, and say so:
+- The plan's assignment is clearly wrong for the task (e.g. `fast` on a task that turns out to need design judgment)
+- An implementer comes back BLOCKED on reasoning — re-dispatch a tier up (see Handling Implementer Status)
 
-**Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
-
-**Architecture, design, and review tasks**: use the most capable available model.
-
-**Task complexity signals:**
-- Touches 1-2 files with a complete spec → cheap model
-- Touches multiple files with integration concerns → standard model
-- Requires design judgment or broad codebase understanding → most capable model
+**If the plan has no `Models:` line** (older plan, or written by hand), fall back to: use the least powerful model that can handle each role.
+- Implementation — touches 1-2 files with a complete spec → `fast`; multiple files / integration concerns → `standard`; design judgment or broad codebase understanding → `most-capable`
+- Spec review — `standard`, bumped to `most-capable` when requirements are subtle
+- Quality review — `standard` for mechanical tasks, `most-capable` when the task carries architectural weight
 
 ## Parallel Dispatch
 
