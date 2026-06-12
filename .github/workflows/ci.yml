@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version sync check
+        run: ./scripts/bump-version.sh --check
+
+      - name: JSON manifests are valid
+        run: |
+          for f in package.json .version-bump.json \
+                   .claude-plugin/plugin.json .claude-plugin/marketplace.json \
+                   .cursor-plugin/plugin.json .codex-plugin/plugin.json \
+                   gemini-extension.json hooks/hooks.json hooks/hooks-cursor.json; do
+            python3 -m json.tool "$f" > /dev/null || { echo "Invalid JSON: $f"; exit 1; }
+          done
+
+      - name: Shell script syntax
+        run: |
+          bash -n hooks/session-start
+          for f in scripts/*.sh skills/brainstorming/scripts/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: JS syntax
+        run: |
+          node --check skills/brainstorming/scripts/server.cjs
+          node --check skills/brainstorming/scripts/helper.js
+          node --check .opencode/plugins/superpowers.js
+
+      - name: SessionStart hook emits valid JSON on every platform
+        run: |
+          CLAUDE_PLUGIN_ROOT="$PWD" ./hooks/run-hook.cmd session-start \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); ctx=d['hookSpecificOutput']['additionalContext']; assert 'You have superpowers' in ctx; assert 'name: using-superpowers' not in ctx, 'frontmatter leaked into context'"
+          CURSOR_PLUGIN_ROOT="$PWD" ./hooks/run-hook.cmd session-start \
+            | python3 -c "import json,sys; assert json.load(sys.stdin)['additional_context']"
+          COPILOT_CLI=1 ./hooks/run-hook.cmd session-start \
+            | python3 -c "import json,sys; assert json.load(sys.stdin)['additionalContext']"
+
+  brainstorm-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run brainstorm server tests
+        working-directory: tests/brainstorm-server
+        run: |
+          npm ci
+          node ws-protocol.test.js
+          node server.test.js

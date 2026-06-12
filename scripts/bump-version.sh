@@ -31,7 +31,9 @@ read_json_field() {
   jq -r "$jq_path" "$file"
 }
 
-# Write a dotted field path in a JSON file, preserving formatting.
+# Write a dotted field path in a JSON file via jq.
+# Note: jq re-emits the file with its default 2-space indentation, so
+# declared files should stay jq-formatted to avoid churn.
 write_json_field() {
   local file="$1" field="$2" value="$3"
   local jq_path
@@ -74,6 +76,11 @@ cmd_check() {
   done < <(declared_files)
 
   echo ""
+
+  if [[ ${#versions[@]} -eq 0 ]]; then
+    echo "No declared files could be read — nothing to compare."
+    return 1
+  fi
 
   # Check if all versions match
   local unique

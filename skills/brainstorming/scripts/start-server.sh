@@ -90,13 +90,6 @@ LOG_FILE="${STATE_DIR}/server.log"
 # Create fresh session directory with content and state peers
 mkdir -p "${SESSION_DIR}/content" "$STATE_DIR"
 
-# Kill any existing server
-if [[ -f "$PID_FILE" ]]; then
-  old_pid=$(cat "$PID_FILE")
-  kill "$old_pid" 2>/dev/null
-  rm -f "$PID_FILE"
-fi
-
 cd "$SCRIPT_DIR"
 
 # Resolve the harness PID (grandparent of this script).
@@ -108,10 +101,12 @@ if [[ -z "$OWNER_PID" || "$OWNER_PID" == "1" ]]; then
 fi
 
 # Foreground mode for environments that reap detached/background processes.
+# exec replaces this shell with node, so the PID written below is node's
+# actual PID — otherwise stop-server.sh would kill the bash wrapper and
+# could leave node running with the port still bound.
 if [[ "$FOREGROUND" == "true" ]]; then
   echo "$$" > "$PID_FILE"
-  env BRAINSTORM_DIR="$SESSION_DIR" BRAINSTORM_HOST="$BIND_HOST" BRAINSTORM_URL_HOST="$URL_HOST" BRAINSTORM_OWNER_PID="$OWNER_PID" node server.cjs
-  exit $?
+  exec env BRAINSTORM_DIR="$SESSION_DIR" BRAINSTORM_HOST="$BIND_HOST" BRAINSTORM_URL_HOST="$URL_HOST" BRAINSTORM_OWNER_PID="$OWNER_PID" node server.cjs
 fi
 
 # Start server, capturing output to log file

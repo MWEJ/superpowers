@@ -73,7 +73,7 @@ function decodeFrame(buffer) {
 
 // ========== Configuration ==========
 
-const PORT = process.env.BRAINSTORM_PORT || (49152 + Math.floor(Math.random() * 16383));
+let PORT = process.env.BRAINSTORM_PORT || (49152 + Math.floor(Math.random() * 16383));
 const HOST = process.env.BRAINSTORM_HOST || '127.0.0.1';
 const URL_HOST = process.env.BRAINSTORM_URL_HOST || (HOST === '127.0.0.1' ? 'localhost' : HOST);
 const SESSION_DIR = process.env.BRAINSTORM_DIR || '/tmp/brainstorm';
@@ -127,6 +127,19 @@ function getNewestScreen() {
 // ========== HTTP Request Handler ==========
 
 function handleRequest(req, res) {
+  try {
+    handleRequestInner(req, res);
+  } catch (err) {
+    // A screen file can disappear or change between readdir/stat and read
+    // (the agent rewrites content while the browser refreshes). Without this
+    // guard the throw is an uncaught exception that kills the whole server.
+    console.error('request error:', err.message);
+    if (!res.headersSent) res.writeHead(500);
+    res.end('Internal error');
+  }
+}
+
+function handleRequestInner(req, res) {
   touchActivity();
   if (req.method === 'GET' && req.url === '/') {
     const screenFile = getNewestScreen();
@@ -143,7 +156,7 @@ function handleRequest(req, res) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
   } else if (req.method === 'GET' && req.url.startsWith('/files/')) {
-    const fileName = req.url.slice(7);
+    const fileName = decodeURIComponent(req.url.slice(7).split('?')[0]);
     const filePath = path.join(CONTENT_DIR, path.basename(fileName));
     if (!fs.existsSync(filePath)) {
       res.writeHead(404);
@@ -336,7 +349,22 @@ function startServer() {
     }
   }
 
-  server.listen(PORT, HOST, () => {
+  // Random ports can collide with another process (or another brainstorm
+  // session). Without an error handler EADDRINUSE is an uncaught exception
+  // that kills the server; retry with a fresh random port instead.
+  let listenAttempts = 0;
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && !process.env.BRAINSTORM_PORT && listenAttempts < 10) {
+      listenAttempts++;
+      PORT = 49152 + Math.floor(Math.random() * 16383);
+      server.listen(PORT, HOST);
+      return;
+    }
+    console.error('server error:', err.message);
+    process.exit(1);
+  });
+
+  server.on('listening', () => {
     const info = JSON.stringify({
       type: 'server-started', port: Number(PORT), host: HOST,
       url_host: URL_HOST, url: 'http://' + URL_HOST + ':' + PORT,
@@ -345,6 +373,8 @@ function startServer() {
     console.log(info);
     fs.writeFileSync(path.join(STATE_DIR, 'server-info'), info + '\n');
   });
+
+  server.listen(PORT, HOST);
 }
 
 if (require.main === module) {
