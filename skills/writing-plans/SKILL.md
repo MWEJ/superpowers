@@ -7,7 +7,7 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD.
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
@@ -40,7 +40,15 @@ This structure informs the task decomposition. Each task should produce self-con
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
 - "Run the tests and make sure they pass" - step
-- "Commit" - step
+
+## Task Dependencies
+
+Mark every task with what it depends on. This is what lets executors run independent tasks in parallel.
+
+- **Depends on: none** — only when the task shares no files with other tasks and consumes no interface defined by a task that isn't complete yet
+- A task that modifies a file another task creates depends on that task
+- Shared touchpoints (package.json, lockfiles, barrel/index files, route tables, migrations) create dependencies even when the "real" work is independent — either serialize those tasks or pull the shared edit into its own task
+- When unsure, declare the dependency. A false dependency costs a little parallelism; a missed one costs a merge conflict.
 
 ## Plan Document Header
 
@@ -64,6 +72,8 @@ This structure informs the task decomposition. Each task should produce self-con
 
 ````markdown
 ### Task N: [Component Name]
+
+**Depends on:** Task M (uses its `WidgetStore` interface) — or `none` if independent
 
 **Files:**
 - Create: `exact/path/to/file.py`
@@ -94,13 +104,6 @@ def function(input):
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
 ````
 
 ## No Placeholders
@@ -117,7 +120,8 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - Exact file paths always
 - Complete code in every step — if a step changes code, show the code
 - Exact commands with expected output
-- DRY, YAGNI, TDD, frequent commits
+- Dependencies marked on every task (`Depends on:`)
+- DRY, YAGNI, TDD
 
 ## Self-Review
 
@@ -128,6 +132,8 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
+
+**4. Dependency audit:** For each task marked `Depends on: none`, check its **Files** list against every other task. Any shared file or use of another task's interface means the marking is wrong — fix it.
 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 

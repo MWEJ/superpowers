@@ -101,6 +101,24 @@ Use the least powerful model that can handle each role to conserve cost and incr
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
+## Parallel Dispatch
+
+Sequential dispatch is the default. You MAY dispatch implementers in parallel only when ALL of these hold:
+
+- The plan marks each task `Depends on: none` (or every dependency is already complete)
+- The tasks' **Files** lists are fully disjoint — including test files
+- None of them touch shared registration points (package.json, lockfiles, barrel/index files, route tables, migrations)
+
+Rules for a parallel batch:
+
+- Dispatch the batch in a single message (multiple Task calls)
+- Cap batches at 3 implementers — review load grows with each one
+- Reviews stay serial and per-task: as each implementer reports DONE, run its spec review, then its code quality review, before marking it complete
+- All implementers share one worktree and branch; disjoint files means their commits won't conflict. If a commit fails on a stale `index.lock` (two commits at the same instant), the implementer retries once
+- One implementer reporting BLOCKED doesn't stop the others — collect all reports, then handle the escalation
+
+When in doubt, dispatch sequentially. A conflict between subagents costs more than parallelism saves.
+
 ## Handling Implementer Status
 
 Implementer subagents report one of four statuses. Handle each appropriately:
@@ -239,7 +257,7 @@ Done!
 - Start implementation on main/master branch without explicit user consent
 - Skip reviews (spec compliance OR code quality)
 - Proceed with unfixed issues
-- Dispatch multiple implementation subagents in parallel (conflicts)
+- Dispatch implementers in parallel for tasks that share files or have unmet dependencies (see Parallel Dispatch)
 - Make subagent read plan file (provide full text instead)
 - Skip scene-setting context (subagent needs to understand where task fits)
 - Ignore subagent questions (answer before letting them proceed)
